@@ -1,10 +1,38 @@
-# CLAUDE.md
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
 
 ## Project Overview
 
 Memos is a lightweight, self-hosted knowledge management and note-taking platform. The architecture pairs a Go backend with a React+Vite frontend, using gRPC for internal communication and providing REST API access via gRPC-Gateway.
+
+> **🚨 CRITICAL: File Modification Policy**
+> 
+> Before adding or modifying ANY file, you MUST:
+> 1. Verify the change is required by the spec/requirement
+> 2. Search for existing functionality that might already handle this
+> 3. Evaluate whether a new file or modification is more appropriate
+> 4. Justify why the file is necessary (prevent unnecessary creation)
+> 5. Document rationale in commit messages
+> 
+> Important: Sometimes creating new files improves clarity and maintainability. The goal is to prevent unnecessary files, not to avoid creating files when they're appropriate.
+> 
+> See `openspec/AGENTS.md` for the complete File Modification Policy checklist.
 
 ## Development Commands
 
@@ -26,6 +54,15 @@ go test ./...                    # All tests
 go test ./store/...              # Store layer tests only
 go test ./server/router/api/v1/test/...  # API tests
 ```
+
+**Test-Driven Development (TDD) Gates:**
+```bash
+./scripts/gates.sh              # Run all tests and linting (backend + frontend)
+```
+This command is the quality gate that MUST pass before completing any task. It runs:
+- All Go tests
+- Go linting (golangci-lint)
+- Frontend linting (TypeScript + ESLint)
 
 **Lint:**
 ```bash
@@ -227,11 +264,40 @@ Scopes: `server`, `api`, `store`, `web`, `proto`, etc.
 
 ## Testing
 
+### Test-Driven Development (TDD)
+
+Follow the Red-Green-Refactor cycle:
+
+1. **Red**: Write a failing test first
+   ```bash
+   # Write test in *_test.go
+   # Run: go test -v ./...  # Should fail
+   ```
+
+2. **Green**: Write minimal code to pass
+   ```bash
+   # Implement feature
+   # Run: go test -v ./...  # Should pass
+   ```
+
+3. **Refactor**: Improve code quality
+   ```bash
+   # Refactor keeping tests green
+   # Run: ./scripts/gates.sh  # All gates must pass
+   ```
+
+### Running Tests
+
 **Go Tests:**
 - Test files: `*_test.go` alongside source files
 - Run specific package: `go test ./store/cache/...`
 - API integration tests: `server/router/api/v1/test/*_test.go`
 - Prefer table-driven tests for multiple test cases
+
+**All Quality Gates:**
+```bash
+./scripts/gates.sh  # Runs all tests + linting
+```
 
 **Frontend:**
 Currently relies on linting and manual testing. For UI changes, validate with local dev server.
@@ -269,22 +335,39 @@ When adding database schema changes:
 
 ### Adding a New API Endpoint
 
-1. Define service method in `proto/api/v1/{service}_service.proto`
-2. Run `buf generate` to regenerate code
-3. Implement method in `server/router/api/v1/{service}_service.go`
-4. Add to public allowlist in `acl_config.go` if unauthenticated
-5. Update frontend client in `web/src/`
+> **⚠️ FILE MODIFICATION CHECK**: Before creating/modifying files, verify the change is required by the spec and search for existing endpoints to avoid duplication.
+
+1. **Verify requirement**: Is this endpoint explicitly required by the spec?
+2. **Search existing code** for similar endpoints (avoid duplication)
+3. **Write failing test** in `server/router/api/v1/test/*_test.go` (TDD Step 1: Red)
+4. Define service method in `proto/api/v1/{service}_service.proto`
+5. Run `buf generate` to regenerate code
+6. **Implement method** in appropriate file:
+   - Evaluate: New file or add to existing service file?
+   - Choose based on clarity and maintainability
+7. Add to public allowlist in `acl_config.go` if unauthenticated
+8. Update frontend client in `web/src/`
+9. **Run gates** to ensure all tests pass: `./scripts/gates.sh` (TDD Step 3: Refactor)
 
 ### Adding a New Data Model
 
-1. Define struct in `store/{model}.go`
-2. Add CRUD methods to `store.Driver` interface in `store/driver.go`
-3. Implement methods in each driver:
+> **⚠️ FILE MODIFICATION CHECK**: Before creating new model files, verify the model is required by the spec and check if existing models might handle this requirement.
+
+1. **Verify requirement**: Is this model explicitly required by the spec?
+2. **Search for similar models** (prevent duplication)
+3. **Evaluate necessity**: Is this truly a new entity or can existing be extended?
+4. **Write failing test** in `store/test/{model}_test.go` (TDD Step 1: Red)
+5. Define struct in `store/{model}.go` (ONLY if new model is required)
+6. Add CRUD methods to `store.Driver` interface in `store/driver.go`
+7. **Implement methods** in each driver:
+   - Evaluate: New file or add to existing driver file?
+   - Choose based on clarity and maintainability
    - `store/db/sqlite/{model}.go`
    - `store/db/mysql/{model}.go`
    - `store/db/postgres/{model}.go`
-4. Create migration files for schema changes
-5. Add tests in `store/test/{model}_test.go`
+8. Create migration files for schema changes (ONLY if schema change required)
+9. **Implement methods** to pass tests (TDD Step 2: Green)
+10. **Run gates** to ensure quality: `./scripts/gates.sh` (TDD Step 3: Refactor)
 
 ### Frontend Data Fetching
 
